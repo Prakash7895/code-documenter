@@ -9,6 +9,7 @@ from core.docgen import DocGenerator, LLMConfig
 from core.embedder import Embedder
 from core.indexer.faiss_indexer import FaissIndexer
 from core.parser import Parser
+from core.treesitter_extractor import TreeSitterExtractor
 from core.types import Chunk
 
 
@@ -18,15 +19,24 @@ client = OpenAI()
 
 
 code_clone_dir = RepoCloner(
-    "https://github.com/Prakash7895/Character-Recognition-using-Backpropagation.git",
+    # "https://github.com/Prakash7895/Character-Recognition-using-Backpropagation.git",
+    "https://github.com/Prakash7895/dating-dapp-server.git"
 )
 
 
-chunks = []
-for file in Path(code_clone_dir.clone_repo()).rglob("*.py"):
-    print("file", file.name)
-    chunks = Parser(file).extract_chunks()
-    print(len(chunks))
+ext = TreeSitterExtractor()
+
+results = ext.extract_chunks(code_clone_dir.clone_repo())
+print(len(results))
+
+chunks = [r for r in results if r.get("name") != "<anon>"]
+
+
+# chunks = []
+# for file in Path(code_clone_dir.clone_repo()).rglob("*.ts"):
+#     print("file", file.name)
+#     chunks = Parser(file).extract_chunks()
+#     print(len(chunks))
 
 id2chunk = {chunk.id: chunk for chunk in chunks}
 
