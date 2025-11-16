@@ -5,6 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from core.cloner import RepoCloner
+from core.docgen import DocGenerator, LLMConfig
 from core.embedder import Embedder
 from core.indexer.faiss_indexer import FaissIndexer
 from core.parser import Parser
@@ -14,19 +15,6 @@ from core.types import Chunk
 load_dotenv()
 
 client = OpenAI()
-
-
-def generate_response(prompt):
-    resp = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
-    )
-    return resp.choices[0].message.content
-
-
-# resp = generate_response("What model are you? what is your name?")
-# print(resp)
 
 
 code_clone_dir = RepoCloner(
@@ -49,12 +37,6 @@ vectors = embedder.embed_texts([func.code for func in chunks])
 print(vectors.shape)
 
 indexer = FaissIndexer(vectors.shape[1])
-indexer.add(vectors, [func.id for func in chunks])
-# indexer.save(code_clone_dir.clone_repo())
-
-
-results = indexer.search(vectors[1])
-print(results)
 
 
 def get_similar_chunks(
@@ -65,46 +47,9 @@ def get_similar_chunks(
     return [(id2chunk[result["id"]], result["score"]) for result in results]
 
 
-FUNCTION_PROMPT = """
-You're an expert software engineer.
-Generate clear, accurate documentation for the following function.
+cfg = LLMConfig(model="gpt-3.5-turbo", temperature=0.0, max_tokens=500)
 
-### Target Function
-File: {file}
-Function: {name}
-Lines: {start}-{end}
-Code: {code}
-
-### Related Code (Context)
-{context}
-
-### Task
-1. Explain what this function does.
-2. Explain parameters & expected types.
-3. Explain return values.
-4. Explain how this fits into the file/module.
-5. Write a short example usage.
-6. Highlight any edge cases or surprising behaviors.
-
-Return only Markdown.
-"""
-
-
-def generate_doc_for_chunk(chunk: Chunk, related_chunks: List[Tuple[Chunk, float]]):
-    context_text = "\n\n".join(
-        [f"#### {c.name} ({c.file})\n```\n{c.code}\n```" for c, score in related_chunks]
-    )
-
-    prompt = FUNCTION_PROMPT.format(
-        file=chunk.file,
-        name=chunk.name,
-        start=chunk.start,
-        end=chunk.end,
-        code=chunk.code,
-        context=context_text,
-    )
-
-    return generate_response(prompt)
+dg = DocGenerator(llm_client=client, config=cfg)
 
 
 def write_markdown(chunk, md, output_dir="./documentations"):
@@ -119,5 +64,5 @@ def write_markdown(chunk, md, output_dir="./documentations"):
 
 for chunk in chunks:
     related_chunks = get_similar_chunks(chunk.code, embedder, indexer, id2chunk)
-    md = generate_doc_for_chunk(chunk, related_chunks)
+    md = dg.generate_function_md(chunk, related_chunks)
     write_markdown(chunk, md)

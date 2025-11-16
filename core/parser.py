@@ -2,7 +2,7 @@ import ast
 from pathlib import Path
 
 from core.types import Chunk
-from core.utils import _make_chunk_id
+from core.utils import make_chunk_id
 
 
 class Parser:
@@ -45,7 +45,7 @@ class Parser:
         for func in funcs:
             chunks.append(
                 Chunk(
-                    id=_make_chunk_id(
+                    id=make_chunk_id(
                         self.repo_dir,
                         func["file"],
                         func["start"],
